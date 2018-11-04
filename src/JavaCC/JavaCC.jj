@@ -1,0 +1,181 @@
+/**
+ * JavaCC template file created by SF JavaCC plugin 1.5.28+ wizard for JavaCC 1.5.0+
+ */options{  static = false;}PARSER_BEGIN(JavaCC)package JavaCC;
+
+import java.io.File;
+import java.io.FileReader;
+
+import me.FJEY.AST.AST;
+import me.FJEY.AST.BinaryOpNode;
+import me.FJEY.AST.IntegerLiteralNode;
+import me.FJEY.AST.IntegerRandomNode;
+import me.FJEY.AST.LiteralNode;
+import me.FJEY.AST.Node;
+import me.FJEY.AST.VariableNode;
+import me.FJEY.Manager.VariableManager;
+
+public class JavaCC{
+  public static void parse(File f) {
+    	try { 
+		JavaCC parser = new JavaCC(new FileReader(f));
+		parser.compliation_unit();
+}catch(Exception e) { System.out.println("Error: " + e.getMessage()); e.printStackTrace();};
+  }
+  }PARSER_END(JavaCC)SKIP :{  " "| "\r"| "\t"}TOKEN : /* OPERATORS */{  < PLUS : "+" >| < MINUS : "-" >| < MULTIPLY : "*" >| < DIVIDE : "/" >
+| < BLOCK_IN:"{">
+| < BlOCK_OUT: "}">
+| < INTEGER: "INT">
+| < STRING: "STRING">
+| < DOUBLE: "DOUBLE">
+| < IF:"IF">
+| < ELSE:"ELSE">
+| < FOR:"FOR">
+| < VAR:"VAR">}
+TOKEN: {
+	< IDENTIFIER: ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_" , "0"-"9"])*>
+}TOKEN :{  < CONSTANT : (< DIGIT >)+ >| < #DIGIT : [ "0"-"9" ] >}
+
+MORE: { "\"" : IN_STRING}
+< IN_STRING >  MORE: {
+	<(~["\n" , "\r" , "\"" , "\\"])+>
+| <"\\" (["0"-"7"]){3}>
+| < "\\" ~[]>
+}
+
+< IN_STRING > TOKEN: { <STR:"\""> : DEFAULT}
+SPECIAL_TOKEN: {<LINE_COMMENT: "//" (~["\n" , "\r"]) * ("\n" | "\r\n" | "\r")? > }
+	
+
+
+SKIP:
+{	<"/*"> : IN_BLOCK_COMMENT
+}
+
+<IN_BLOCK_COMMENT> MORE: { <~[]>}
+< IN_BLOCK_COMMENT > SKIP: {<"*/" ("\n" | "\r\n" | "\r")?>  :DEFAULT}
+
+void compliation_unit():
+{
+Node x = null;
+}
+{
+  (x=stmts(){AST.push(x);})*  < EOF >
+}
+
+Node stmts():{
+	Node n;
+	Token x;
+}
+{
+  
+ "\n" { return new LiteralNode("String","\n");}
+| LOOKAHEAD(2)
+  n= expr2() {return n; }
+|  n=simplestmts() {return n;}
+
+  
+}
+
+Node simplestmts(): {
+	Token x;
+	Node n;
+} {
+x=<CONSTANT> {return new LiteralNode("Integer", Integer.parseInt(x.image));}
+| x=<STR> { return new LiteralNode("String", x.image);}
+| n=var_identifier() { return n;}
+| "{" n=stmt() "}"{ return n;}
+
+}
+
+
+Node stmt():
+{
+	Node x;
+}
+{	x=literal_stmt() { return x;}
+|   x=var_stmt() { return x;}
+|   "\n" { return new LiteralNode("String", "\n");}
+
+}
+
+LiteralNode literal_stmt(): {LiteralNode x,y; }
+{
+	x=string_stmt() { return x;}
+| 	y=int_stmt() {return y;}
+}
+
+LiteralNode string_stmt(): { Token x;}
+{
+	< STRING > "f:" x=<STR> { return new LiteralNode("String", x.image);}
+}
+
+LiteralNode int_stmt():
+{
+	Node x=null,y=null;
+	Token t;
+}
+{
+  LOOKAHEAD(2)
+  < INTEGER > "r:" ["m-:" x=stmts()] ["m+:" y=stmts()] {
+	 	if(x != null && y != null) {
+	 	  int xi = x.getValue() instanceof Integer ? (int)x.getValue() : Integer.parseInt((String)x.getValue());
+	  	int yi = y.getValue() instanceof Integer ? (int)y.getValue() : Integer.parseInt((String)y.getValue());
+		
+	 		return new IntegerRandomNode(yi,xi);
+		
+	}
+	if(x == null && y == null) { return new IntegerRandomNode(); }
+	if(x == null) {
+	  	int yi = y.getValue() instanceof Integer ? (int)y.getValue() : Integer.parseInt((String)y.getValue());
+		 return new IntegerRandomNode(yi,0); }
+	if(y == null) { int xi = x.getValue() instanceof Integer ? (int)x.getValue() : Integer.parseInt((String)x.getValue());
+	  	
+		return new IntegerRandomNode(Integer.MAX_VALUE,xi); }
+    
+
+    }
+| < INTEGER > "f:" t=<CONSTANT> { return new IntegerLiteralNode(Integer.parseInt(t.image));}
+}
+
+VariableNode var_identifier(): {
+	Token t;
+}
+{
+	t=< IDENTIFIER > { if(VariableManager.isDeclared(t.image)) {
+	return VariableManager.getVar(t.image);
+	}else {
+	throw new ParseException("Variable " + t +" is not declared.");
+	}}
+}
+
+VariableNode var_stmt():{
+  Token x=null;
+  Token y=null;
+  Node n=null;
+  
+}
+{
+  	//< VAR >  x=< IDENTIFIER > ":" y=< IDENTIFIER > { return new VariableNode(x.image,"Variable");}
+    < VAR >  x=< IDENTIFIER > (":" n=stmts())? { VariableNode v = new VariableNode(x.image,n.getType(), n); VariableManager.declareVar(v); return v; }
+}
+
+Node expr2(): {
+	Node l,r;
+}
+{
+	l=expr1() ("+" r=expr1() { l = new BinaryOpNode(l,r,"+");}
+			|"-" r=expr1() { l = new BinaryOpNode(l,r,"-");}
+			)* {
+			  return l;
+			}
+}
+
+Node expr1(): {
+	Node l,r;
+  }
+{
+	l=simplestmts() ( "*" r=simplestmts() { l = new BinaryOpNode(l,r,"*");}
+					| "/" r=simplestmts() { l = new BinaryOpNode(l,r,"/");}
+					| "%" r=simplestmts() { l = new BinaryOpNode(l,r,"%");}
+					)* { return l;}
+} 
